@@ -1,1 +1,15 @@
-
+{
+  "date_readable": "Wednesday, August 27, 2025",
+  "items": [
+    {
+      "section": "AI & New Tech",
+      "title": "Test headline",
+      "summary": "This is a 4–5 line test item to confirm everything works and is visible on Cloudflare Pages.",
+      "why": "To validate the pipeline end-to-end.",
+      "sources": [
+        {"name":"FT","url":"https://www.ft.com/"},
+        {"name":"Reuters","url":"https://www.reuters.com/"}
+      ]
+    }
+  ]
+}
