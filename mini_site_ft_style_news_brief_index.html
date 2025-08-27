@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark">
+  <title>Daily Anglo‑American News Brief</title>
+  <meta name="description" content="Concise, FT‑style daily brief from UK & US outlets (last 24h).">
+  <style>
+    :root{
+      --bg: #ffffff;
+      --fg: #111111;
+      --muted: #6a6a6a;
+      --accent: #b48b68; /* warm accent reminiscent of print */
+      --link: #0059a6;
+      --maxw: 780px;
+      --shadow: 0 6px 20px rgba(0,0,0,.06);
+    }
+    @media (prefers-color-scheme: dark){
+      :root{ --bg:#0f1115; --fg:#f2f2f2; --muted:#a3a3a3; --accent:#c9a27f; --link:#7db9ff; }
+    }
+    /* explicit theme overrides */
+    html[data-theme="light"]{ --bg:#ffffff; --fg:#111111; --muted:#6a6a6a; --accent:#b48b68; --link:#0059a6; }
+    html[data-theme="dark"]{ --bg:#0f1115; --fg:#f2f2f2; --muted:#a3a3a3; --accent:#c9a27f; --link:#7db9ff; }
+
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;}
+    header{position:sticky; top:0; backdrop-filter:saturate(140%) blur(6px); background:color-mix(in oklab, var(--bg) 88%, transparent); border-bottom:1px solid rgba(0,0,0,.06); padding:16px 12px; z-index:50}
+    .wrap{max-width:var(--maxw);margin:0 auto}
+    h1{font-size:1.7rem; line-height:1.2; margin:0 0 6px;}
+    .meta{color:var(--muted); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; display:flex; gap:12px; align-items:center; flex-wrap:wrap}
+    main{padding:16px 12px}
+    article{padding:20px 16px; border-bottom:1px solid rgba(0,0,0,.06)}
+    h2{font-size:1.12rem; margin:0 0 6px; font-weight:700}
+    h3{font-size:1rem; margin:12px 0 6px; font-weight:700}
+    p{margin:8px 0; line-height:1.6}
+    .why{font-style:italic;}
+    .sources{margin-top:6px; font-size:.95rem; color:var(--muted)}
+    a{color:var(--link); text-decoration:none}
+    a:hover{text-decoration:underline}
+    .section{color:var(--accent); letter-spacing:.02em; text-transform:uppercase; font-size:.85rem; font-weight:700; margin:6px 0 10px}
+    .controls{display:flex; gap:10px; align-items:center; font-family: ui-sans-serif, system-ui; flex-wrap:wrap}
+    .controls > *{font-size:.95rem}
+    button, select{background:transparent; border:1px solid rgba(0,0,0,.2); padding:6px 10px; border-radius:8px; cursor:pointer}
+    select{appearance:none}
+    .toc{position:sticky; top:68px; background:color-mix(in oklab, var(--bg) 90%, transparent); border-top:1px solid rgba(0,0,0,.06); border-bottom:1px solid rgba(0,0,0,.06);}
+    .toc .wrap{display:flex; gap:14px; overflow:auto; scrollbar-width:thin; padding:10px 12px}
+    .toc a{font-family: ui-sans-serif, system-ui; font-size:.95rem}
+    .pill{display:inline-block; padding:6px 10px; border-radius:999px; border:1px solid rgba(0,0,0,.2); box-shadow: var(--shadow)}
+    footer{padding:28px 12px; color:var(--muted); font-family: ui-sans-serif, system-ui;}
+    .note{font-size:.92rem}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Daily Anglo‑American News Brief</h1>
+      <div class="meta">
+        <span id="date">—</span>
+        <div class="controls">
+          <button id="refresh" title="Reload latest">Refresh</button>
+          <label>
+            Archive:
+            <select id="archiveSelect" title="Pick a date">
+              <option value="latest">Latest</option>
+            </select>
+          </label>
+          <label>
+            Theme:
+            <select id="themeSelect" title="Display theme">
+              <option value="auto">Auto</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <div class="wrap" id="toc">
+      <!-- dynamic section anchors here -->
+    </div>
+  </nav>
+
+  <main class="wrap" id="brief"></main>
+
+  <footer class="wrap">
+    <p>Sources cited inline (e.g., [FT], [BBC], [Reuters], [NYT], [WSJ], [AP], [Bloomberg], [Guardian], [Axios], [Wired], [The Verge], [TechCrunch]).</p>
+    <p class="note">Tip: Add this page to your phone’s home screen. For archive: ensure your automation writes <code>/archive.json</code> and daily files like <code>/archive/brief-YYYY-MM-DD.json</code>.</p>
+  </footer>
+
+  <script>
+  // ---------- Theme handling ----------
+  const themeSelect = document.getElementById('themeSelect');
+  function applyTheme(mode){
+    document.documentElement.setAttribute('data-theme', mode);
+    try{ localStorage.setItem('brief-theme', mode); }catch(e){}
+  }
+  (function initTheme(){
+    const saved = localStorage.getItem('brief-theme') || 'auto';
+    themeSelect.value = saved;
+    applyTheme(saved);
+  })();
+  themeSelect.addEventListener('change', e => applyTheme(e.target.value));
+
+  // ---------- Elements ----------
+  const dateEl = document.getElementById('date');
+  const briefEl = document.getElementById('brief');
+  const refreshBtn = document.getElementById('refresh');
+  const tocEl = document.getElementById('toc');
+  const archiveSelect = document.getElementById('archiveSelect');
+
+  function fmtDate(d){
+    return new Intl.DateTimeFormat(undefined, {weekday:'long', year:'numeric', month:'long', day:'numeric'}).format(d);
+  }
+
+  const DEFAULT_SECTIONS = [
+    'AI & New Tech',
+    'World Politics & Power Dynamics',
+    'U.S. Domestic Politics',
+    'Society & Public Concerns',
+    'Critical Extras'
+  ];
+
+  function slugify(s){
+    return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+  }
+
+  function buildTOC(presentSections){
+    tocEl.innerHTML = '';
+    presentSections.forEach(sec => {
+      const a = document.createElement('a');
+      a.href = '#' + slugify(sec);
+      a.className = 'pill';
+      a.textContent = sec;
+      tocEl.appendChild(a);
+    });
+  }
+
+  function render(data){
+    try{ localStorage.setItem('brief-cache', JSON.stringify(data)); }catch(e){}
+    dateEl.textContent = data.date_readable || fmtDate(new Date());
+
+    const sections = DEFAULT_SECTIONS;
+    const bySection = new Map(sections.map(s => [s, []]));
+    (data.items || []).forEach(item => {
+      const bucket = bySection.has(item.section) ? item.section : 'Critical Extras';
+      bySection.get(bucket).push(item);
+    });
+
+    const present = [];
+    briefEl.innerHTML = '';
+    for(const [section, items] of bySection){
+      if(!items || !items.length) continue;
+      present.push(section);
+      const sect = document.createElement('article');
+      const id = slugify(section);
+      sect.id = id;
+      sect.innerHTML = `<div class="section">${section}</div>`;
+      items.forEach(it => {
+        const block = document.createElement('div');
+        block.innerHTML = `
+          <h2>${it.title || ''}</h2>
+          <p>${it.summary || ''}</p>
+          ${it.why ? `<p class="why">Why it matters — ${it.why}</p>` : ''}
+          ${Array.isArray(it.sources) && it.sources.length ? `<div class="sources">Sources: ${it.sources.map(s => s.url ? `<a href="${s.url}" target="_blank" rel="noopener">[${s.name||'source'}]</a>` : `[${s.name||'source'}]`).join(' ')}</div>` : ''}
+        `;
+        sect.appendChild(block);
+      });
+      briefEl.appendChild(sect);
+    }
+    buildTOC(present);
+    if(!present.length){
+      briefEl.innerHTML = `<article><div class="section">No data yet</div><p>The daily brief will appear here once published.</p></article>`;
+    }
+  }
+
+  async function loadFrom(path){
+    try{
+      const r = await fetch(path, {cache:'no-store'});
+      if(!r.ok) throw new Error('Not found: '+path);
+      const data = await r.json();
+      render(data);
+    }catch(err){
+      const cached = localStorage.getItem('brief-cache');
+      if(cached){ render(JSON.parse(cached)); }
+      else{
+        briefEl.innerHTML = `<article><div class="section">No data yet</div><p>The daily brief will appear here once published.</p></article>`;
+        dateEl.textContent = fmtDate(new Date());
+      }
+    }
+  }
+
+  async function populateArchive(){
+    try{
+      const r = await fetch('/archive.json', {cache:'no-store'});
+      if(!r.ok) return; // optional
+      const idx = await r.json();
+      const dates = Array.isArray(idx.dates) ? idx.dates : [];
+      dates.sort((a,b)=> b.localeCompare(a)); // newest first
+      dates.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d; opt.textContent = d;
+        archiveSelect.appendChild(opt);
+      });
+    }catch(e){ /* ignore */ }
+  }
+
+  function loadSelected(){
+    const v = archiveSelect.value;
+    if(v === 'latest') loadFrom('/brief.json');
+    else loadFrom(`/archive/brief-${v}.json`);
+  }
+
+  refreshBtn.addEventListener('click', loadSelected);
+  archiveSelect.addEventListener('change', loadSelected);
+
+  // initial
+  populateArchive().then(loadSelected);
+  </script>
+</body>
+</html>
